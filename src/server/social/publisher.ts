@@ -3,7 +3,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 import { writeAuditLog } from "@/server/audit/log";
 import { decryptToken } from "@/server/crypto/token-vault";
-import { getMetaPostMetrics, publishMetaGroupPost, publishMetaPagePost } from "@/server/meta/client";
+import { getMetaPostMetrics } from "@/server/meta/client";
+import { realMetaPublisherAdapter, type MetaPublisherAdapter } from "@/server/meta/publisher-adapter";
 import { buildPostMessage, classifyMetaFailure, metaPostUrl, nextRetryAt } from "@/server/social/publish-rules";
 import {
   evaluateGroupDistribution,
@@ -51,7 +52,7 @@ async function groupActivity(socialGroupId: string, timezone: string, now: Date)
   return { postsToday, lastPostedAt: last?.publishedAt ?? null };
 }
 
-async function processClaimedTarget(targetId: string, lockToken: string): Promise<PublishResult> {
+async function processClaimedTarget(targetId: string, lockToken: string, adapter: MetaPublisherAdapter): Promise<PublishResult> {
   const target = await prisma.socialPublishTarget.findFirst({ where: { id: targetId, lockToken }, include: targetInclude });
   if (!target) return { targetId, status: "SKIPPED", error: "Target đã được worker khác xử lý" };
 
@@ -151,8 +152,8 @@ async function processClaimedTarget(targetId: string, lockToken: string): Promis
   try {
     const token = decryptToken(connection.encryptedToken);
     const published = groupPostTargetId
-      ? await publishMetaGroupPost(groupPostTargetId, token, message)
-      : await publishMetaPagePost(target.socialPage.externalPageId, token, message);
+      ? await adapter.publishGroupPost(groupPostTargetId, token, message)
+      : await adapter.publishPagePost(target.socialPage.externalPageId, token, message);
     const postId = published.id;
 
     const writes: Prisma.PrismaPromise<unknown>[] = [
@@ -191,7 +192,8 @@ async function processClaimedTarget(targetId: string, lockToken: string): Promis
   }
 }
 
-export async function processSocialPublishQueue(input: { limit?: number; targetId?: string } = {}) {
+export async function processSocialPublishQueue(input: { limit?: number; targetId?: string; adapter?: MetaPublisherAdapter } = {}) {
+  const adapter = input.adapter ?? realMetaPublisherAdapter;
   const now = new Date();
   const staleLock = new Date(now.getTime() - 5 * 60_000);
   const candidates = await prisma.socialPublishTarget.findMany({
@@ -220,7 +222,7 @@ export async function processSocialPublishQueue(input: { limit?: number; targetI
       data: { lockedAt: now, lockToken, lastAttemptAt: now, attempts: { increment: 1 } },
     });
     if (claimed.count !== 1) continue;
-    results.push(await processClaimedTarget(candidate.id, lockToken));
+    results.push(await processClaimedTarget(candidate.id, lockToken, adapter));
   }
   return results;
 }
