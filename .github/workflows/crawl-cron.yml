@@ -1,13 +1,11 @@
 name: Auto Crawl & Rewrite
 
 on:
-  schedule:
-    # Every Monday and Thursday at 2:00 AM UTC (9:00 AM Vietnam time)
-    - cron: "0 2 * * 1,4"
   workflow_dispatch:
 
 jobs:
   crawl:
+    if: ${{ false }}
     name: Run Content Crawl Pipeline
     runs-on: ubuntu-latest
 
@@ -17,7 +15,7 @@ jobs:
           RESPONSE=$(curl -s -o /tmp/crawl_response.json -w "%{http_code}" \
             -X GET \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://admin.30nice.vn/api/cron/crawl")
+            "https://gfvgo.com/api/cron/crawl")
 
           echo "HTTP status: $RESPONSE"
           cat /tmp/crawl_response.json

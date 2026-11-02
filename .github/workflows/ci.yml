@@ -16,6 +16,21 @@ jobs:
     name: Typecheck, lint, test and build
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       # Build-time placeholders only. No production credential is needed:
       # every page is server-rendered on demand, so nothing queries the
@@ -38,6 +53,9 @@ jobs:
 
       - name: Generate Prisma client
         run: npm run prisma:generate
+
+      - name: Apply Prisma migrations to CI database
+        run: npx prisma migrate deploy
 
       - name: Typecheck
         run: npm run typecheck

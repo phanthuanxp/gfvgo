@@ -1,15 +1,15 @@
 #!/bin/bash
-# Safe deploy / update 30Nice Growth OS
+# Safe deploy / update GFVGO
 # Usage from the app directory:
 #   bash deploy/deploy.sh
 #
-# This project is currently deployed directly at /var/www/30nice-growth-os.
+# This project is deployed directly at /var/www/gfvgo.
 # Do not assume the production directory is a git repository.
 
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/var/www/30nice-growth-os}"
-APP_NAME="${APP_NAME:-30nice-growth-os}"
+APP_DIR="${APP_DIR:-/var/www/gfvgo}"
+APP_NAME="${APP_NAME:-gfvgo}"
 BACKUP_DIR="${BACKUP_DIR:-${APP_DIR}/.deploy-backups}"
 TS="$(date +%Y%m%d-%H%M%S)"
 
