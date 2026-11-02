@@ -57,6 +57,22 @@ jobs:
       - name: Apply Prisma baseline to new CI database
         run: npx prisma migrate deploy --config prisma/baseline.config.ts
 
+      - name: Seed synthetic tenant and Social data
+        env:
+          ADMIN_EMAIL: ci-admin@example.test
+          ADMIN_PASSWORD: ci-only-synthetic-password
+          SEED_SOCIAL_DEMO: "true"
+        run: npm run seed
+
+      - name: Backup and restore CI database
+        env:
+          PGPASSWORD: ci
+        run: |
+          pg_dump --format=custom --file=/tmp/gfvgo-ci.dump "$DATABASE_URL"
+          psql -h localhost -U ci -d postgres -c 'CREATE DATABASE gfvgo_restore'
+          pg_restore --exit-on-error --dbname=postgresql://ci:ci@localhost:5432/gfvgo_restore /tmp/gfvgo-ci.dump
+          psql -h localhost -U ci -d gfvgo_restore -c 'SELECT COUNT(*) FROM "Tenant"'
+
       - name: Typecheck
         run: npm run typecheck
 
