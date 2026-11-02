@@ -54,8 +54,8 @@ jobs:
       - name: Generate Prisma client
         run: npm run prisma:generate
 
-      - name: Apply Prisma migrations to CI database
-        run: npx prisma migrate deploy
+      - name: Apply Prisma baseline to new CI database
+        run: npx prisma migrate deploy --config prisma/baseline.config.ts
 
       - name: Typecheck
         run: npm run typecheck

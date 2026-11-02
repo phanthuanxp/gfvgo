@@ -1,0 +1,1153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  AGENCY_ADMIN
+  TENANT_ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum TenantStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  name                String?
+  passwordHash        String?
+  role                Role                 @default(VIEWER)
+  organizationMembers OrganizationMember[]
+  tenantMembers       TenantMember[]
+  auditLogs           AuditLog[]
+  keywordProjects     KeywordProject[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model Organization {
+  id        String               @id @default(cuid())
+  name      String
+  slug      String               @unique
+  members   OrganizationMember[]
+  tenants   Tenant[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  role           Role         @default(AGENCY_ADMIN)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model Tenant {
+  id                    String            @id @default(cuid())
+  organizationId        String?
+  name                  String
+  slug                  String            @unique
+  primaryDomain         String?           @unique
+  status                TenantStatus      @default(ACTIVE)
+  logoUrl               String?
+  brandPrimary          String?           @default("#10b981")
+  brandSecondary        String?           @default("#0ea5e9")
+  businessName          String?
+  businessPhone         String?
+  businessEmail         String?
+  businessAddress       String?
+  defaultSeoTitle       String?
+  defaultSeoDescription String?
+  organization          Organization?     @relation(fields: [organizationId], references: [id])
+  members               TenantMember[]
+  settings              SiteSettings?
+  domains               Domain[]
+  pages                 Page[]
+  pageRevisions         PageRevision[]
+  posts                 Post[]
+  postRevisions         PostRevision[]
+  categories            Category[]
+  mediaAssets           MediaAsset[]
+  menus                 Menu[]
+  forms                 Form[]
+  formSubmissions       FormSubmission[]
+  redirectRules         RedirectRule[]
+  aiUsageLogs           AiUsageLog[]
+  seoAudits             SeoAudit[]
+  integrations          Integration[]
+  automationJobs        AutomationJob[]
+  analyticsEvents       AnalyticsEvent[]
+  auditLogs             AuditLog[]
+  keywordClusters       KeywordCluster[]
+  aiContentJobs         AiContentJob[]
+  subdomainPlans        SubdomainPlan[]
+  contentPlans          ContentPlan[]
+  contentSources        ContentSource[]
+  sourceArticles        SourceArticle[]
+  crawlJobs             CrawlJob[]
+  socialWorkspaces      SocialWorkspace[]
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@index([status])
+}
+
+model TenantMember {
+  id       String @id @default(cuid())
+  tenantId String
+  userId   String
+  role     Role   @default(EDITOR)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+}
+
+model SiteSettings {
+  id                    String  @id @default(cuid())
+  tenantId              String  @unique
+  logoUrl               String?
+  faviconUrl            String?
+  primaryColor          String? @default("#10b981")
+  secondaryColor        String? @default("#0ea5e9")
+  phone                 String?
+  email                 String?
+  address               String?
+  socialLinks           Json?
+  defaultSeoTitle       String?
+  defaultSeoDescription String?
+  theme                 String? @default("default")
+  themeConfig           Json?
+  tenant                Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Domain {
+  id        String   @id @default(cuid())
+  tenantId  String
+  host      String   @unique
+  verified  Boolean  @default(false)
+  primary   Boolean  @default(false)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Page {
+  id             String         @id @default(cuid())
+  tenantId       String
+  title          String
+  slug           String
+  status         ContentStatus  @default(DRAFT)
+  summary        String?
+  seoTitle       String?
+  seoDescription String?
+  ogImageUrl     String?
+  uiBlocks       Json
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  revisions      PageRevision[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+}
+
+model PageRevision {
+  id             String        @id @default(cuid())
+  tenantId       String
+  pageId         String
+  title          String
+  slug           String
+  status         ContentStatus
+  summary        String?
+  seoTitle       String?
+  seoDescription String?
+  ogImageUrl     String?
+  uiBlocks       Json
+  version        Int           @default(1)
+  createdById    String?
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  page           Page          @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+
+  @@index([tenantId, pageId])
+  @@index([pageId, version])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  slug      String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  posts     Post[]
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+}
+
+model Post {
+  id             String         @id @default(cuid())
+  tenantId       String
+  categoryId     String?
+  title          String
+  slug           String
+  excerpt        String?
+  content        String
+  featuredImage  String?
+  status         ContentStatus  @default(DRAFT)
+  seoTitle       String?
+  seoDescription String?
+  ogTitle        String?
+  ogDescription  String?
+  ogImage        String?
+  twitterCard    String?
+  schemaType     String?
+  schemaData     String?
+  robotsMeta     String?
+  canonicalUrl   String?
+  qualityScore   Int?
+  seoScore       Int?
+  qualityReport  Json?
+  publishedAt    DateTime?
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category       Category?      @relation(fields: [categoryId], references: [id])
+  revisions      PostRevision[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+}
+
+model PostRevision {
+  id             String        @id @default(cuid())
+  tenantId       String
+  postId         String
+  categoryId     String?
+  title          String
+  slug           String
+  excerpt        String?
+  content        String
+  featuredImage  String?
+  status         ContentStatus
+  seoTitle       String?
+  seoDescription String?
+  ogTitle        String?
+  ogDescription  String?
+  ogImage        String?
+  twitterCard    String?
+  schemaType     String?
+  schemaData     String?
+  robotsMeta     String?
+  canonicalUrl   String?
+  version        Int           @default(1)
+  createdById    String?
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  post           Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+
+  @@index([tenantId, postId])
+  @@index([postId, version])
+}
+
+model MediaAsset {
+  id        String   @id @default(cuid())
+  tenantId  String
+  url       String
+  alt       String?
+  filename  String
+  mimeType  String
+  size      Int
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Menu {
+  id        String     @id @default(cuid())
+  tenantId  String
+  name      String
+  location  String
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items     MenuItem[]
+  createdAt DateTime   @default(now())
+
+  @@index([tenantId])
+}
+
+model MenuItem {
+  id       String     @id @default(cuid())
+  menuId   String
+  parentId String?
+  label    String
+  href     String
+  order    Int        @default(0)
+  menu     Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  parent   MenuItem?  @relation("MenuItemTree", fields: [parentId], references: [id])
+  children MenuItem[] @relation("MenuItemTree")
+
+  @@index([menuId])
+}
+
+model Form {
+  id          String           @id @default(cuid())
+  tenantId    String
+  name        String
+  slug        String
+  description String?
+  fields      Json
+  settings    Json?
+  active      Boolean          @default(true)
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  submissions FormSubmission[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, active])
+}
+
+model FormSubmission {
+  id           String   @id @default(cuid())
+  tenantId     String
+  formId       String?
+  leadId       String?
+  payload      Json
+  sourcePath   String?
+  sourceDomain String?
+  userAgent    String?
+  ipHash       String?
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  form         Form?    @relation(fields: [formId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([formId])
+  @@index([leadId])
+}
+
+model RedirectRule {
+  id         String   @id @default(cuid())
+  tenantId   String
+  fromPath   String
+  toPath     String
+  statusCode Int      @default(301)
+  active     Boolean  @default(true)
+  note       String?
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, fromPath])
+  @@index([tenantId, active])
+}
+
+model AiUsageLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  feature   String
+  tokens    Int      @default(0)
+  cost      Decimal? @db.Decimal(10, 4)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model SeoAudit {
+  id        String   @id @default(cuid())
+  tenantId  String
+  score     Int
+  issues    Json?
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Integration {
+  id        String   @id @default(cuid())
+  tenantId  String
+  provider  String
+  status    String   @default("DISCONNECTED")
+  config    Json?
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, provider])
+}
+
+model AutomationJob {
+  id        String   @id @default(cuid())
+  tenantId  String
+  type      String
+  status    String   @default("PENDING")
+  payload   Json?
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+}
+
+// ---------- Social Growth OS / Page Factory (Phase A) ----------
+
+enum SocialPlatform {
+  FACEBOOK
+}
+
+enum SocialWorkspaceStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum SocialPageStatus {
+  PLANNING
+  SETUP
+  CONNECTED
+  PAUSED
+  ARCHIVED
+}
+
+enum SocialPlanStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum SocialContentStatus {
+  IDEA
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  FAILED
+  SKIPPED
+}
+
+enum SocialPublishTargetType {
+  PAGE
+  GROUP
+}
+
+enum SocialPublishStatus {
+  DRAFT
+  PENDING_APPROVAL
+  SCHEDULED
+  PUBLISHED
+  MANUAL_REQUIRED
+  FAILED
+  SKIPPED
+}
+
+enum SocialGroupMode {
+  MANUAL_ONLY
+  API_ALLOWED
+  DISABLED
+}
+
+enum SocialGroupStatus {
+  CANDIDATE
+  APPROVED
+  PAUSED
+  REJECTED
+}
+
+model SocialWorkspace {
+  id        String                @id @default(cuid())
+  tenantId  String
+  name      String
+  slug      String
+  status    SocialWorkspaceStatus @default(DRAFT)
+  objective String?
+  locale    String                @default("vi-VN")
+  timezone  String                @default("Asia/Bangkok")
+  tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pages     SocialPage[]
+  groups    SocialGroup[]
+  plans     SocialContentPlan[]
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+}
+
+model SocialPage {
+  id             String                @id @default(cuid())
+  workspaceId    String
+  platform       SocialPlatform        @default(FACEBOOK)
+  name           String
+  slug           String
+  externalPageId String?
+  pageUrl        String?
+  status         SocialPageStatus      @default(PLANNING)
+  category       String?
+  objective      String?
+  targetAudience Json?
+  brandVoice     Json?
+  contentPillars Json?
+  postingRules   Json?
+  launchKit      Json?
+  workspace      SocialWorkspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connection     SocialConnection?
+  plans          SocialContentPlan[]
+  contents       SocialContent[]
+  publishTargets SocialPublishTarget[]
+  oauthSessions  MetaOAuthSession[]
+  comments       SocialComment[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([workspaceId, slug])
+  @@unique([platform, externalPageId])
+  @@index([workspaceId, status])
+}
+
+model SocialConnection {
+  id               String     @id @default(cuid())
+  socialPageId     String     @unique
+  encryptedToken   String
+  tokenExpiresAt   DateTime?
+  grantedScopes    String[]
+  connectionStatus String     @default("CONNECTED")
+  lastValidatedAt  DateTime?
+  socialPage       SocialPage @relation(fields: [socialPageId], references: [id], onDelete: Cascade)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+model SocialContentPlan {
+  id           String           @id @default(cuid())
+  workspaceId  String
+  socialPageId String
+  title        String
+  objective    String?
+  startDate    DateTime
+  endDate      DateTime
+  status       SocialPlanStatus @default(DRAFT)
+  strategy     Json?
+  workspace    SocialWorkspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  socialPage   SocialPage       @relation(fields: [socialPageId], references: [id], onDelete: Cascade)
+  contents     SocialContent[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([socialPageId, startDate])
+}
+
+model SocialContent {
+  id             String                  @id @default(cuid())
+  planId         String?
+  socialPageId   String
+  topic          String
+  pillar         String?
+  format         String                  @default("POST")
+  title          String?
+  hook           String?
+  caption        String?
+  callToAction   String?
+  hashtags       String[]
+  mediaBrief     Json?
+  status         SocialContentStatus     @default(IDEA)
+  scheduledAt    DateTime?
+  approvedAt     DateTime?
+  approvedById   String?
+  sourcePostId   String?
+  plan           SocialContentPlan?      @relation(fields: [planId], references: [id], onDelete: SetNull)
+  socialPage     SocialPage              @relation(fields: [socialPageId], references: [id], onDelete: Cascade)
+  publishTargets SocialPublishTarget[]
+  revisions      SocialContentRevision[]
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@index([socialPageId, status, scheduledAt])
+  @@index([planId])
+}
+
+model SocialContentRevision {
+  id              String        @id @default(cuid())
+  socialContentId String
+  version         Int
+  snapshot        Json
+  changeNote      String?
+  createdById     String?
+  content         SocialContent @relation(fields: [socialContentId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@unique([socialContentId, version])
+  @@index([socialContentId, createdAt])
+}
+
+model SocialGroup {
+  id              String                @id @default(cuid())
+  workspaceId     String
+  name            String
+  groupUrl        String?
+  externalGroupId String?
+  status          SocialGroupStatus     @default(CANDIDATE)
+  mode            SocialGroupMode       @default(MANUAL_ONLY)
+  topics          String[]
+  rules           Json?
+  dailyPostLimit  Int                   @default(1)
+  cooldownHours   Int                   @default(24)
+  allowLinks      Boolean               @default(true)
+  allowPromotion  Boolean               @default(true)
+  /// Set only after the connected Page token was checked against this group.
+  /// API_ALLOWED without this stamp still falls back to the manual workflow.
+  apiVerifiedAt   DateTime?
+  approvedAt      DateTime?
+  approvedById    String?
+  statusReason    String?
+  workspace       SocialWorkspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  publishTargets  SocialPublishTarget[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([workspaceId, status])
+}
+
+model SocialPublishTarget {
+  id               String                  @id @default(cuid())
+  socialContentId  String
+  socialPageId     String
+  socialGroupId    String?
+  targetType       SocialPublishTargetType
+  captionOverride  String?
+  scheduledAt      DateTime?
+  publishedAt      DateTime?
+  externalPostId   String?
+  status           SocialPublishStatus     @default(DRAFT)
+  errorMessage     String?
+  idempotencyKey   String                  @unique
+  attempts         Int                     @default(0)
+  maxAttempts      Int                     @default(3)
+  lastAttemptAt    DateTime?
+  nextAttemptAt    DateTime?
+  lockedAt         DateTime?
+  lockToken        String?
+  permanentFailure Boolean                 @default(false)
+  externalPostUrl  String?
+  responseMetadata Json?
+  /// Who marked a MANUAL_ONLY group post as done. Null for API publishes.
+  manualPostedById String?
+  content          SocialContent           @relation(fields: [socialContentId], references: [id], onDelete: Cascade)
+  socialPage       SocialPage              @relation(fields: [socialPageId], references: [id], onDelete: Cascade)
+  socialGroup      SocialGroup?            @relation(fields: [socialGroupId], references: [id], onDelete: SetNull)
+  insight          SocialPostInsight?
+  comments         SocialComment[]
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([socialPageId, status, scheduledAt])
+  @@index([socialGroupId, status])
+  @@index([socialGroupId, publishedAt])
+  @@index([status, scheduledAt, nextAttemptAt])
+}
+
+model MetaOAuthSession {
+  id                  String     @id @default(cuid())
+  userId              String
+  socialPageId        String
+  availablePages      Json
+  encryptedPageTokens Json
+  expiresAt           DateTime
+  consumedAt          DateTime?
+  socialPage          SocialPage @relation(fields: [socialPageId], references: [id], onDelete: Cascade)
+  createdAt           DateTime   @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([socialPageId, expiresAt])
+}
+
+model SocialPostInsight {
+  id              String              @id @default(cuid())
+  publishTargetId String              @unique
+  views           Int                 @default(0)
+  reach           Int                 @default(0)
+  engagements     Int                 @default(0)
+  reactions       Int                 @default(0)
+  comments        Int                 @default(0)
+  shares          Int                 @default(0)
+  rawMetrics      Json?
+  capturedAt      DateTime            @default(now())
+  publishTarget   SocialPublishTarget @relation(fields: [publishTargetId], references: [id], onDelete: Cascade)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([capturedAt])
+}
+
+model SocialWebhookEvent {
+  id             String    @id @default(cuid())
+  eventHash      String    @unique
+  externalPageId String?
+  field          String?
+  payload        Json
+  processedAt    DateTime?
+  attempts       Int       @default(0)
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
+
+  @@index([externalPageId, createdAt])
+  @@index([processedAt, createdAt])
+}
+
+/// A comment on a published Page post, rebuilt from the feed webhook.
+/// Group posts are absent: a Page token sees no group comment stream.
+model SocialComment {
+  id                String               @id @default(cuid())
+  externalCommentId String               @unique
+  externalPostId    String
+  publishTargetId   String?
+  socialPageId      String?
+  parentCommentId   String?
+  authorId          String?
+  authorName        String?
+  message           String?
+  /// True when the Page itself wrote the comment, so replies are not counted
+  /// as incoming engagement.
+  isFromPage        Boolean              @default(false)
+  postedAt          DateTime
+  publishTarget     SocialPublishTarget? @relation(fields: [publishTargetId], references: [id], onDelete: SetNull)
+  socialPage        SocialPage?          @relation(fields: [socialPageId], references: [id], onDelete: SetNull)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([socialPageId, postedAt])
+  @@index([publishTargetId, postedAt])
+  @@index([externalPostId])
+}
+
+model AiProviderConfig {
+  id         String   @id @default(cuid())
+  provider   String   @unique
+  label      String
+  apiKey     String?
+  baseUrl    String?
+  model      String?
+  isActive   Boolean  @default(false)
+  isDefault  Boolean  @default(false)
+  isFallback Boolean  @default(false)
+  priority   Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  tenantId  String
+  type      String   @default("pageview")
+  path      String
+  referrer  String?
+  device    String?
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, path])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  tenantId   String?
+  action     String
+  resource   String?
+  resourceId String?
+  metadata   Json?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([action])
+}
+
+// ---------- SEO Keyword Engine (Phase 2) ----------
+
+enum SeoIntent {
+  INFORMATIONAL
+  COMMERCIAL
+  TRANSACTIONAL
+  NAVIGATIONAL
+  UNKNOWN
+}
+
+enum KeywordProjectStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model KeywordProject {
+  id             String               @id @default(cuid())
+  name           String
+  niche          String?
+  description    String?
+  language       String               @default("vi")
+  country        String               @default("VN")
+  status         KeywordProjectStatus @default(DRAFT)
+  ownerId        String?
+  owner          User?                @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  keywords       Keyword[]
+  clusters       KeywordCluster[]
+  subdomainPlans SubdomainPlan[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([status])
+  @@index([ownerId])
+}
+
+model Keyword {
+  id             String                 @id @default(cuid())
+  projectId      String
+  project        KeywordProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  text           String
+  normalizedText String
+  searchVolume   Int?
+  difficulty     Int?
+  cpc            Decimal?               @db.Decimal(10, 2)
+  competition    Float?
+  intent         SeoIntent              @default(UNKNOWN)
+  language       String                 @default("vi")
+  country        String                 @default("VN")
+  source         String?
+  embedding      Json?
+  metadata       Json?
+  clusterMembers KeywordClusterMember[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([projectId, normalizedText])
+  @@index([projectId, intent])
+  @@index([projectId, searchVolume])
+}
+
+model KeywordCluster {
+  id               String                 @id @default(cuid())
+  projectId        String
+  project          KeywordProject         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name             String
+  headKeyword      String?
+  intent           SeoIntent              @default(UNKNOWN)
+  totalVolume      Int                    @default(0)
+  avgDifficulty    Int?
+  suggestedSlug    String?
+  suggestedDomain  String?
+  assignedTenantId String?
+  assignedTenant   Tenant?                @relation(fields: [assignedTenantId], references: [id], onDelete: SetNull)
+  members          KeywordClusterMember[]
+  notes            String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([projectId])
+  @@index([assignedTenantId])
+}
+
+model KeywordClusterMember {
+  id         String         @id @default(cuid())
+  clusterId  String
+  cluster    KeywordCluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  keywordId  String
+  keyword    Keyword        @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  isPrimary  Boolean        @default(false)
+  similarity Float?
+  createdAt  DateTime       @default(now())
+
+  @@unique([clusterId, keywordId])
+  @@index([keywordId])
+}
+
+// ---------- Subdomain Factory / Travel Content Planning (Phase 2A) ----------
+
+enum SubdomainPlanStatus {
+  DRAFT
+  APPROVED
+  CREATED
+  REJECTED
+}
+
+enum ContentPlanStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum ContentPlanItemStatus {
+  PLANNED
+  DRAFTING
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  SKIPPED
+}
+
+model SubdomainPlan {
+  id               String              @id @default(cuid())
+  rootDomain       String
+  subdomain        String
+  fullDomain       String
+  keyword          String
+  niche            String?
+  location         String?
+  intent           String?
+  language         String              @default("en")
+  seoScore         Int                 @default(0)
+  opportunityScore Int                 @default(0)
+  rationale        String?
+  status           SubdomainPlanStatus @default(DRAFT)
+  keywordProjectId String?
+  keywordProject   KeywordProject?     @relation(fields: [keywordProjectId], references: [id], onDelete: SetNull)
+  tenantId         String?
+  tenant           Tenant?             @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  contentPlans     ContentPlan[]
+  createdById      String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([rootDomain, subdomain])
+  @@index([status])
+  @@index([fullDomain])
+  @@index([keywordProjectId])
+  @@index([tenantId])
+}
+
+model ContentPlan {
+  id              String            @id @default(cuid())
+  tenantId        String?
+  tenant          Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subdomainPlanId String?
+  subdomainPlan   SubdomainPlan?    @relation(fields: [subdomainPlanId], references: [id], onDelete: Cascade)
+  title           String
+  goal            String?
+  language        String            @default("en")
+  status          ContentPlanStatus @default(DRAFT)
+  items           ContentPlanItem[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([tenantId])
+  @@index([subdomainPlanId])
+  @@index([status])
+}
+
+model ContentPlanItem {
+  id            String                @id @default(cuid())
+  contentPlanId String
+  contentPlan   ContentPlan           @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
+  keyword       String
+  title         String
+  intent        String?
+  articleType   String                @default("travel_guide")
+  priority      Int                   @default(50)
+  status        ContentPlanItemStatus @default(PLANNED)
+  scheduledAt   DateTime?
+  postId        String?
+  notes         String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([contentPlanId])
+  @@index([status])
+  @@index([priority])
+}
+
+// ---------- Content Source / Crawl Engine (Phase 3A) ----------
+
+enum ContentSourceType {
+  WEBSITE
+  SITEMAP
+  RSS
+  MANUAL_URL_LIST
+}
+
+enum CrawlStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum SourceArticleStatus {
+  DISCOVERED
+  EXTRACTED
+  READY_FOR_REWRITE
+  REWRITE_QUEUED
+  DRAFT_CREATED
+  SCHEDULED
+  PUBLISHED
+  DUPLICATE
+  FAILED
+}
+
+model ContentSource {
+  id            String            @id @default(cuid())
+  tenantId      String?
+  tenant        Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  baseUrl       String
+  sourceType    ContentSourceType @default(WEBSITE)
+  language      String            @default("en")
+  niche         String?
+  active        Boolean           @default(true)
+  crawlStatus   CrawlStatus       @default(PENDING)
+  lastCrawledAt DateTime?
+  articles      SourceArticle[]
+  crawlJobs     CrawlJob[]
+  createdById   String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([tenantId, baseUrl])
+  @@index([tenantId])
+  @@index([sourceType])
+  @@index([crawlStatus])
+}
+
+model SourceArticle {
+  id                 String              @id @default(cuid())
+  tenantId           String?
+  tenant             Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sourceId           String?
+  source             ContentSource?      @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  url                String
+  title              String?
+  canonicalUrl       String?
+  rawHtml            String?
+  extractedText      String?
+  excerpt            String?
+  author             String?
+  publishedAt        DateTime?
+  imageUrl           String?
+  contentHash        String?
+  language           String              @default("en")
+  status             SourceArticleStatus @default(DISCOVERED)
+  targetKeyword      String?
+  subdomainPlanId    String?
+  draftPostId        String?
+  contentPlanItemId  String?
+  scheduledPublishAt DateTime?
+  reviewedAt         DateTime?
+  reviewedById       String?
+  metadata           Json?
+  errorMessage       String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@unique([url])
+  @@index([tenantId])
+  @@index([sourceId])
+  @@index([status])
+  @@index([contentHash])
+  @@index([draftPostId])
+  @@index([contentPlanItemId])
+}
+
+model CrawlJob {
+  id           String         @id @default(cuid())
+  tenantId     String?
+  tenant       Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sourceId     String?
+  source       ContentSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  status       CrawlStatus    @default(PENDING)
+  input        Json?
+  discovered   Int            @default(0)
+  extracted    Int            @default(0)
+  failed       Int            @default(0)
+  errorMessage String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdById  String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([tenantId])
+  @@index([sourceId])
+  @@index([status])
+}
+
+// ---------- AI Content Engine (Phase 5) ----------
+
+enum AiContentJobStatus {
+  PENDING
+  BRIEF_READY
+  GENERATING
+  DRAFT
+  REVIEW
+  PUBLISHED
+  FAILED
+}
+
+enum AiContentType {
+  BLOG_POST
+  LANDING_PAGE
+  SERVICE_PAGE
+  FAQ_PAGE
+  REVIEW_PAGE
+  COMPARISON_PAGE
+}
+
+model AiContentJob {
+  id             String             @id @default(cuid())
+  tenantId       String
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title          String
+  targetKeyword  String?
+  keywords       String[]
+  contentType    AiContentType      @default(BLOG_POST)
+  targetLength   Int                @default(1000)
+  language       String             @default("vi")
+  status         AiContentJobStatus @default(PENDING)
+  brief          Json?
+  draftHtml      String?
+  draftText      String?
+  seoTitle       String?
+  seoDescription String?
+  pageId         String?
+  postId         String?
+  errorMessage   String?
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([createdById])
+}
