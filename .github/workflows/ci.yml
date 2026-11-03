@@ -64,6 +64,9 @@ jobs:
           SEED_SOCIAL_DEMO: "true"
         run: npm run seed
 
+      - name: Collect non-sensitive database metadata
+        run: npx tsx scripts/inspect-db-metadata.ts > /tmp/gfvgo-db-metadata.json
+
       - name: Backup and restore CI database
         env:
           PGPASSWORD: ci
