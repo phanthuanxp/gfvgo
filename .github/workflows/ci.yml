@@ -91,3 +91,17 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Audit Linux security candidate
+        run: |
+          npm audit --omit=dev --json > /tmp/npm-audit-linux-candidate.json || true
+          node -e "const x=require('/tmp/npm-audit-linux-candidate.json'); console.log(JSON.stringify(x.metadata?.vulnerabilities||{},null,2))"
+
+      - name: Upload Linux dependency candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: gfvgo-linux-dependency-candidate
+          path: |
+            package.json
+            package-lock.json
+            /tmp/npm-audit-linux-candidate.json
